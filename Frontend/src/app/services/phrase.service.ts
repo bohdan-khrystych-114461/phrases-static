@@ -203,7 +203,7 @@ export class PhraseService {
   }
 
   private async callGroqApi(phrase: string): Promise<{ meaning: string; example: string; personalNote: string }> {
-    const apiKey = window.APP_CONFIG?.groqApiKey || environment.groqApiKey;
+    const apiKey = environment.groqApiKey;
     if (!apiKey) {
       throw new Error('GROQ API key not configured');
     }
