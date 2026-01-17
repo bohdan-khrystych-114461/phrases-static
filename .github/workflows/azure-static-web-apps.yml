@@ -19,7 +19,11 @@ jobs:
         with:
           submodules: true
           lfs: false
-
+      - name: Replace environment variables
+        run: |
+          sed -i "s|__SUPABASE_URL__|${{ secrets.SUPABASE_URL }}|g" Frontend/src/environments/environment.prod.ts
+          sed -i "s|__SUPABASE_ANON_KEY__|${{ secrets.SUPABASE_ANON_KEY }}|g" Frontend/src/environments/environment.prod.ts
+          sed -i "s|__GROQ_API_KEY__|${{ secrets.GROQ_API_KEY }}|g" Frontend/src/environments/environment.prod.ts
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1

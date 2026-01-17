@@ -1,7 +1,7 @@
 export const environment = {
   production: false,
   apiUrl: '/api',
-  supabaseUrl: 'https://ovtkkxykxhjppmgkxcvz.supabase.co',
-  supabaseAnonKey: 'sb_publishable_fIdn7EI8-j0xSMnSdDvQMQ_gBJHezjH',
-  groqApiKey: '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'
+  supabaseUrl: '__SUPABASE_URL__',
+  supabaseAnonKey: '__SUPABASE_ANON_KEY__',
+  groqApiKey: '__GROQ_API_KEY__'
 };

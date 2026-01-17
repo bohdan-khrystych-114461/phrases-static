@@ -1,7 +1,7 @@
 export const environment = {
   production: true,
   apiUrl: '',
-  supabaseUrl: '${SUPABASE_URL}',
-  supabaseAnonKey: '${SUPABASE_ANON_KEY}',
-  groqApiKey: '${GROQ_API_KEY}'
+  supabaseUrl: '__SUPABASE_URL__',
+  supabaseAnonKey: '__SUPABASE_ANON_KEY__',
+  groqApiKey: '__GROQ_API_KEY__'
 };
