@@ -1,6 +1,6 @@
-// Runtime configuration - override these for production deployment
+// Runtime configuration - these placeholders are replaced during CI/CD build
 window.APP_CONFIG = {
-  supabaseUrl: 'https://ovtkkxykxhjppmgkxcvz.supabase.co',
-  supabaseAnonKey: 'sb_publishable_fIdn7EI8-j0xSMnSdDvQMQ_gBJHezjH',
-  groqApiKey: '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'
+  supabaseUrl: '__SUPABASE_URL__',
+  supabaseAnonKey: '__SUPABASE_ANON_KEY__',
+  groqApiKey: '__GROQ_API_KEY__'
 };
