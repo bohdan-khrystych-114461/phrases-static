@@ -576,18 +576,37 @@ export class DashboardComponent implements OnInit {
   saveEdit(): void {
     if (!this.editingPhrase || this.saving) return;
     
-    this.saving = true;
-    this.phraseService.updatePhrase(this.editingPhrase.id, this.editForm).subscribe({
+    const id = this.editingPhrase.id;
+    
+    // Optimistic update - update UI immediately
+    const optimisticPhrase: Phrase = {
+      ...this.editingPhrase,
+      text: this.editForm.text,
+      meaning: this.editForm.meaning || null,
+      example: this.editForm.example || null,
+      personalNote: this.editForm.personalNote || null,
+      status: this.editForm.status as 'New' | 'Learning' | 'Mastered'
+    };
+    
+    const idx = this.phrases.findIndex(p => p.id === id);
+    if (idx >= 0) this.phrases[idx] = optimisticPhrase;
+    const allIdx = this.allPhrases.findIndex(p => p.id === id);
+    if (allIdx >= 0) this.allPhrases[allIdx] = optimisticPhrase;
+    
+    this.closeEdit();
+    
+    // Sync with database in background
+    this.phraseService.updatePhrase(id, this.editForm).subscribe({
       next: (updated) => {
-        const idx = this.phrases.findIndex(p => p.id === updated.id);
-        if (idx >= 0) this.phrases[idx] = updated;
-        const allIdx = this.allPhrases.findIndex(p => p.id === updated.id);
-        if (allIdx >= 0) this.allPhrases[allIdx] = updated;
-        this.saving = false;
-        this.closeEdit();
+        // Update with server response (in case of any differences)
+        const i = this.phrases.findIndex(p => p.id === updated.id);
+        if (i >= 0) this.phrases[i] = updated;
+        const ai = this.allPhrases.findIndex(p => p.id === updated.id);
+        if (ai >= 0) this.allPhrases[ai] = updated;
       },
       error: () => {
-        this.saving = false;
+        // Revert on error - reload from server
+        this.loadPhrases();
       }
     });
   }

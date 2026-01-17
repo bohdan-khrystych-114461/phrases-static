@@ -29,7 +29,9 @@
                 "input": "public"
               },
               "src/config.js",
-              "src/favicon.svg"
+              "src/favicon.svg",
+              "src/apple-touch-icon.png",
+              "staticwebapp.config.json"
             ],
             "styles": ["src/styles.css"],
             "scripts": []

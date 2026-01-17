@@ -1,2 +1,6 @@
-// Configuration - set API_URL before deploying to production
-window.API_URL = 'https://phrases-be.onrender.com/api';
+// Runtime configuration - override these for production deployment
+window.APP_CONFIG = {
+  supabaseUrl: 'https://ovtkkxykxhjppmgkxcvz.supabase.co',
+  supabaseAnonKey: 'sb_publishable_fIdn7EI8-j0xSMnSdDvQMQ_gBJHezjH',
+  groqApiKey: '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'
+};

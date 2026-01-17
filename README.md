@@ -4,105 +4,89 @@ A single-user phrase learning app with spaced repetition.
 
 ## Tech Stack
 
-- **Backend**: ASP.NET Core 9, Entity Framework Core, SQLite
 - **Frontend**: Angular 19, standalone components
-- **Container**: Docker (multi-stage build)
+- **Database**: Supabase (PostgreSQL)
+- **AI**: GROQ API (Llama 3.1 for autofill)
+- **Hosting**: Azure Static Web Apps
 
 ## Features
 
 - Add phrases with meaning, example, and personal notes
+- AI-powered autofill (✨ button)
 - Spaced repetition review system
 - Mobile-first responsive design
-- Single container deployment
+- Voice input support
 
 ## Review Logic
 
-| Status   | Review Interval |
-|----------|-----------------|
-| New      | Immediately     |
-| Learning | 1-2 days        |
-| Known    | 7 days          |
-
-- **Know**: Confidence +1, advance status when confidence >= 3
-- **Don't Know**: Confidence -1, revert to Learning if Known
-
-## API Endpoints
-
-| Method | Endpoint            | Description              |
-|--------|---------------------|--------------------------|
-| GET    | /api/review/today   | Get phrases due today    |
-| POST   | /api/phrases        | Create a new phrase      |
-| PUT    | /api/phrases/{id}   | Update a phrase          |
-| POST   | /api/review/{id}    | Submit review action     |
+- **Know**: Mark as Mastered, won't appear again
+- **Don't Know**: Keep in Learning, show again in current session
 
 ## Local Development
 
 ### Prerequisites
 
-- .NET 9 SDK
 - Node.js 22+
-- Docker (for containerized run)
 
-### Run with Docker
+### Setup
+
+1. Clone the repo
+2. Configure `Frontend/src/config.js` with your Supabase and GROQ credentials
+3. Run:
 
 ```bash
-docker build -t phrase-learner .
-docker run -p 8080:8080 -v phrase-data:/data phrase-learner
+cd Frontend
+npm install
+npm start
 ```
 
-Open http://localhost:8080
+Open http://localhost:4200
 
-## Deploy to Render.com
+## Deploy to Azure Static Web Apps
 
-1. **Create a new Web Service** on Render
-2. **Connect your repository**
-3. **Configure settings**:
-   - **Environment**: Docker
-   - **Region**: Choose closest to you
-   - **Instance Type**: Free or Starter
-4. **Add a Disk**:
-   - **Mount Path**: `/data`
-   - **Size**: 1 GB (minimum)
-5. **Deploy**
+1. Push to GitHub
+2. Create Azure Static Web App:
+   - **Source**: GitHub
+   - **App location**: `/Frontend`
+   - **Output location**: `dist/phrase-learner/browser`
+3. Add deployment token to GitHub secrets as `AZURE_STATIC_WEB_APPS_API_TOKEN`
 
-### Render.com Configuration
+## Supabase Setup
 
-Create a `render.yaml` in your repo root (optional, for Blueprint):
+Create a `phrases` table:
 
-```yaml
-services:
-  - type: web
-    name: phrase-learner
-    runtime: docker
-    plan: free
-    healthCheckPath: /api/review/today
-    disk:
-      name: phrase-data
-      mountPath: /data
-      sizeGB: 1
+```sql
+CREATE TABLE phrases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  text TEXT NOT NULL,
+  meaning TEXT,
+  example TEXT,
+  personal_note TEXT,
+  status INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_reviewed_at TIMESTAMPTZ,
+  next_review_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE phrases ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow all" ON phrases FOR ALL USING (true);
 ```
 
 ## Project Structure
 
 ```
-phrases/
-├── Backend/
-│   └── PhraseLearner.Api/
-│       ├── Controllers/
-│       ├── Data/
-│       ├── Dtos/
-│       ├── Migrations/
-│       ├── Models/
-│       ├── Services/
-│       └── Program.cs
+phrases2/
 ├── Frontend/
 │   └── src/
-│       └── app/
-│           ├── add-phrase/
-│           ├── models/
-│           ├── review/
-│           └── services/
-├── Dockerfile
+│       ├── app/
+│       │   ├── add-phrase/
+│       │   ├── dashboard/
+│       │   ├── review/
+│       │   ├── models/
+│       │   └── services/
+│       ├── config.js
+│       └── environments/
+├── .github/workflows/
 └── README.md
 ```
 
