@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: phrase-learner
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/review/today
+    disk:
+      name: phrase-data
+      mountPath: /data
+      sizeGB: 1
