@@ -4,20 +4,17 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { PhraseService } from '../services/phrase.service';
 import { CreatePhraseDto } from '../models/phrase.model';
+import { HeaderComponent } from '../shared/header/header.component';
 
 declare var webkitSpeechRecognition: any;
 
 @Component({
   selector: 'app-add-phrase',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, HeaderComponent],
   template: `
     <div class="container">
-      <header class="header">
-        <a routerLink="/" class="back-btn">← Back</a>
-        <h1>Add Phrase</h1>
-        <div class="spacer"></div>
-      </header>
+      <app-header leftLink="/" leftText="Cancel" title="Add Phrase" [showAdd]="false"></app-header>
 
       <main class="main">
         <form class="form" (ngSubmit)="onSubmit()">
@@ -32,7 +29,7 @@ declare var webkitSpeechRecognition: any;
                 placeholder="Enter the phrase"
                 required
               >
-              @if (speechSupported) {
+              @if (speechSupported && isDesktop) {
                 <button 
                   type="button" 
                   class="mic-btn" 
@@ -65,7 +62,7 @@ declare var webkitSpeechRecognition: any;
                 placeholder="What does it mean?"
                 rows="3"
               ></textarea>
-              @if (speechSupported) {
+              @if (speechSupported && isDesktop) {
                 <button 
                   type="button" 
                   class="mic-btn" 
@@ -88,7 +85,7 @@ declare var webkitSpeechRecognition: any;
                 placeholder="Use it in a sentence"
                 rows="3"
               ></textarea>
-              @if (speechSupported) {
+              @if (speechSupported && isDesktop) {
                 <button 
                   type="button" 
                   class="mic-btn" 
@@ -111,7 +108,7 @@ declare var webkitSpeechRecognition: any;
                 placeholder="Any notes to help you remember"
                 rows="2"
               ></textarea>
-              @if (speechSupported) {
+              @if (speechSupported && isDesktop) {
                 <button 
                   type="button" 
                   class="mic-btn" 
@@ -147,30 +144,6 @@ declare var webkitSpeechRecognition: any;
       margin: 0 auto;
     }
 
-    .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-
-    .header h1 {
-      color: white;
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-
-    .back-btn {
-      color: white;
-      text-decoration: none;
-      font-weight: 500;
-      padding: 8px 0;
-    }
-
-    .spacer {
-      width: 50px;
-    }
-
     .form {
       background: white;
       border-radius: 20px;
@@ -184,26 +157,36 @@ declare var webkitSpeechRecognition: any;
 
     .field label {
       display: block;
-      font-size: 0.875rem;
+      font-size: 0.8rem;
       font-weight: 600;
-      color: #333;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 8px;
     }
 
     .field input,
     .field textarea {
       width: 100%;
-      padding: 12px 16px;
+      padding: 12px 14px;
       font-size: 1rem;
-      border: 2px solid #e0e0e0;
-      border-radius: 12px;
-      transition: border-color 0.2s;
+      border: none;
+      border-radius: 10px;
+      background: #f7f8fa;
+      transition: background 0.2s, box-shadow 0.2s;
       resize: vertical;
+      min-height: auto;
+    }
+
+    .field textarea {
+      min-height: 70px;
     }
 
     .field input:focus,
     .field textarea:focus {
-      border-color: #667eea;
+      background: #fff;
+      box-shadow: 0 0 0 2px #667eea;
+      outline: none;
     }
 
     .submit-btn {
@@ -334,6 +317,7 @@ export class AddPhraseComponent implements OnDestroy {
   autofilling = false;
   
   speechSupported = false;
+  isDesktop = false;
   activeField: string | null = null;
   private recognition: any = null;
 
@@ -342,11 +326,19 @@ export class AddPhraseComponent implements OnDestroy {
     private router: Router,
     private ngZone: NgZone
   ) {
+    this.checkIfDesktop();
     this.initSpeechRecognition();
   }
 
   ngOnDestroy(): void {
     this.stopRecognition();
+  }
+
+  private checkIfDesktop(): void {
+    // Check if device is desktop (no touch or large screen)
+    const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const isLargeScreen = window.innerWidth >= 1024;
+    this.isDesktop = !hasTouch || isLargeScreen;
   }
 
   private initSpeechRecognition(): void {

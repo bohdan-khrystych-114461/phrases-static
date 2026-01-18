@@ -4,17 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { PhraseService } from '../services/phrase.service';
 import { Phrase } from '../models/phrase.model';
+import { HeaderComponent } from '../shared/header/header.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, HeaderComponent],
   template: `
     <div class="container">
       <header class="header">
-        <a routerLink="/" class="back-btn">← Review</a>
-        <h1>All Phrases</h1>
-        <a routerLink="/add" class="add-btn">+ Add</a>
+        <a routerLink="/" class="header-btn">← Review</a>
+        <button class="header-btn export" (click)="exportPhrases()" [disabled]="phrases.length === 0">
+          {{ exportMessage || '📋 Export' }}
+        </button>
+        <a routerLink="/add" class="header-btn">+ Add</a>
       </header>
 
       <div class="filters">
@@ -26,30 +29,22 @@ import { Phrase } from '../models/phrase.model';
             placeholder="Search phrases..."
           >
         </div>
-        <div class="status-filter">
-          <select [(ngModel)]="statusFilter" (change)="onSearch()">
-            <option value="">All Status</option>
-            <option value="New">New</option>
-            <option value="Learning">Learning</option>
-            <option value="Known">Known</option>
-          </select>
-        </div>
       </div>
 
       <div class="stats">
-        <div class="stat">
+        <div class="stat" [class.active]="statusFilter === ''" (click)="filterByStatus('')">
           <span class="stat-value">{{ totalCount }}</span>
           <span class="stat-label">Total</span>
         </div>
-        <div class="stat new">
+        <div class="stat new" [class.active]="statusFilter === 'New'" (click)="filterByStatus('New')">
           <span class="stat-value">{{ newCount }}</span>
           <span class="stat-label">New</span>
         </div>
-        <div class="stat learning">
+        <div class="stat learning" [class.active]="statusFilter === 'Learning'" (click)="filterByStatus('Learning')">
           <span class="stat-value">{{ learningCount }}</span>
           <span class="stat-label">Learning</span>
         </div>
-        <div class="stat mastered">
+        <div class="stat mastered" [class.active]="statusFilter === 'Mastered'" (click)="filterByStatus('Mastered')">
           <span class="stat-value">{{ masteredCount }}</span>
           <span class="stat-label">Mastered</span>
         </div>
@@ -113,36 +108,51 @@ import { Phrase } from '../models/phrase.model';
             <form (ngSubmit)="saveEdit()">
               <div class="field">
                 <label>Phrase</label>
-                <input type="text" [(ngModel)]="editForm.text" name="text" required>
+                <div class="input-with-btn">
+                  <input type="text" [(ngModel)]="editForm.text" name="text" required>
+                  <button 
+                    type="button" 
+                    class="autofill-btn" 
+                    (click)="autofill()"
+                    [disabled]="!editForm.text.trim() || autofilling"
+                    title="Auto-fill with AI"
+                  >
+                    {{ autofilling ? '...' : '✨' }}
+                  </button>
+                </div>
               </div>
               <div class="field">
                 <label>Meaning</label>
-                <textarea [(ngModel)]="editForm.meaning" name="meaning" rows="2"></textarea>
+                <textarea [(ngModel)]="editForm.meaning" name="meaning" rows="3"></textarea>
               </div>
               <div class="field">
                 <label>Example</label>
-                <textarea [(ngModel)]="editForm.example" name="example" rows="2"></textarea>
+                <textarea [(ngModel)]="editForm.example" name="example" rows="3"></textarea>
               </div>
-              <div class="field">
-                <label>Personal Note</label>
-                <textarea [(ngModel)]="editForm.personalNote" name="personalNote" rows="2"></textarea>
-              </div>
-              <div class="field">
-                <label>Status</label>
-                <select [(ngModel)]="editForm.status" name="status">
-                  <option value="New">New</option>
-                  <option value="Learning">Learning</option>
-                  <option value="Mastered">Mastered</option>
-                </select>
+              <div class="field field-row">
+                <div class="field-half">
+                  <label>Personal Note</label>
+                  <textarea [(ngModel)]="editForm.personalNote" name="personalNote" rows="2"></textarea>
+                </div>
+                <div class="field-quarter">
+                  <label>Status</label>
+                  <select [(ngModel)]="editForm.status" name="status">
+                    <option value="New">New</option>
+                    <option value="Learning">Learning</option>
+                    <option value="Mastered">Mastered</option>
+                  </select>
+                </div>
               </div>
               <div class="modal-actions">
-                <button type="button" class="delete-btn" (click)="deletePhrase()" [disabled]="saving">
-                  🗑️ Delete
+                <button type="button" class="delete-link" (click)="deletePhrase()" [disabled]="saving">
+                  Delete
                 </button>
-                <button type="button" class="cancel-btn" (click)="closeEdit()">Cancel</button>
-                <button type="submit" class="save-btn" [disabled]="saving">
-                  {{ saving ? 'Saving...' : 'Save' }}
-                </button>
+                <div class="action-buttons">
+                  <button type="button" class="cancel-btn" (click)="closeEdit()">Cancel</button>
+                  <button type="submit" class="save-btn" [disabled]="saving">
+                    {{ saving ? 'Saving...' : 'Save' }}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -162,27 +172,39 @@ import { Phrase } from '../models/phrase.model';
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
       margin-bottom: 20px;
     }
 
-    .header h1 {
-      color: white;
-      font-size: 1.25rem;
-      font-weight: 700;
-    }
-
-    .back-btn, .add-btn {
+    .header-btn {
       color: white;
       text-decoration: none;
       font-weight: 500;
       padding: 8px 12px;
       border-radius: 8px;
       background: rgba(255,255,255,0.15);
-      transition: background 0.2s;
+      transition: background 0.2s, transform 0.15s;
     }
 
-    .back-btn:hover, .add-btn:hover {
+    .header-btn:hover {
       background: rgba(255,255,255,0.25);
+    }
+
+    .header-btn:active {
+      transform: scale(0.95);
+    }
+
+    .header-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .header-btn.export {
+      flex: 1;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .filters {
@@ -203,14 +225,6 @@ import { Phrase } from '../models/phrase.model';
       background: white;
     }
 
-    .status-filter select {
-      padding: 12px 16px;
-      border-radius: 12px;
-      font-size: 1rem;
-      background: white;
-      cursor: pointer;
-    }
-
     .stats {
       display: flex;
       gap: 8px;
@@ -223,6 +237,16 @@ import { Phrase } from '../models/phrase.model';
       border-radius: 12px;
       padding: 12px 8px;
       text-align: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .stat:active {
+      transform: scale(0.95);
+    }
+
+    .stat.active {
+      box-shadow: 0 0 0 3px white;
     }
 
     .stat-value {
@@ -241,6 +265,10 @@ import { Phrase } from '../models/phrase.model';
     .stat.new { background: rgba(25, 118, 210, 0.3); }
     .stat.learning { background: rgba(245, 124, 0, 0.3); }
     .stat.mastered { background: rgba(56, 142, 60, 0.3); }
+    
+    .stat.new.active { background: rgba(25, 118, 210, 0.6); }
+    .stat.learning.active { background: rgba(245, 124, 0, 0.6); }
+    .stat.mastered.active { background: rgba(56, 142, 60, 0.6); }
 
     .loading, .empty {
       text-align: center;
@@ -414,80 +442,131 @@ import { Phrase } from '../models/phrase.model';
     }
 
     .field {
-      margin-bottom: 16px;
+      margin-bottom: 20px;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 16px;
+    }
+
+    .field-half {
+      flex: 2;
+    }
+
+    .field-quarter {
+      flex: 1;
     }
 
     .field label {
       display: block;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 600;
-      color: #333;
-      margin-bottom: 6px;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
     }
 
     .field input,
     .field textarea,
     .field select {
       width: 100%;
-      padding: 10px 12px;
-      font-size: 1rem;
-      border: 2px solid #e0e0e0;
-      border-radius: 8px;
-      transition: border-color 0.2s;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      border: none;
+      border-radius: 10px;
+      background: #f7f8fa;
+      transition: background 0.2s, box-shadow 0.2s;
+    }
+
+    .field textarea {
+      min-height: 60px;
+      resize: vertical;
     }
 
     .field input:focus,
     .field textarea:focus,
     .field select:focus {
-      border-color: #667eea;
+      background: #fff;
+      box-shadow: 0 0 0 2px #667eea;
       outline: none;
     }
 
-    .modal-actions {
-      display: flex;
-      gap: 12px;
-      margin-top: 20px;
-    }
-
-    .cancel-btn, .save-btn {
-      flex: 1;
-      padding: 12px;
-      font-size: 1rem;
-      font-weight: 600;
-      border-radius: 8px;
-    }
-
-    .cancel-btn {
-      background: #f5f5f5;
-      color: #666;
-    }
-
-    .save-btn {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
-
-    .save-btn:disabled {
-      opacity: 0.6;
-    }
-
-    .delete-btn {
-      background: #ffebee;
-      color: #c62828;
-    }
-
-    .delete-btn:hover {
-      background: #ffcdd2;
-    }
-
-    .modal-actions {
+    .input-with-btn {
       display: flex;
       gap: 8px;
     }
 
-    .delete-btn {
-      flex: 0;
-      padding: 12px 16px;
+    .input-with-btn input {
+      flex: 1;
+    }
+
+    .autofill-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      font-size: 1.1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .autofill-btn:disabled {
+      opacity: 0.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+    }
+
+    .delete-link {
+      background: none;
+      color: #c62828;
+      font-size: 0.9rem;
+      font-weight: 500;
+      padding: 8px 0;
+    }
+
+    .delete-link:hover {
+      text-decoration: underline;
+    }
+
+    .delete-link:disabled {
+      opacity: 0.5;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .cancel-btn {
+      padding: 12px 20px;
+      background: #f5f5f5;
+      color: #666;
+      border-radius: 10px;
+      font-weight: 500;
+    }
+
+    .save-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .save-btn:disabled {
+      opacity: 0.6;
     }
   `]
 })
@@ -501,6 +580,8 @@ export class DashboardComponent implements OnInit {
   editingPhrase: Phrase | null = null;
   editForm = { text: '', meaning: '', example: '', personalNote: '', status: '' };
   saving = false;
+  autofilling = false;
+  exportMessage = '';
 
   // Swipe state
   swipedId: string | null = null;
@@ -556,6 +637,11 @@ export class DashboardComponent implements OnInit {
     this.searchTerm = '';
     this.statusFilter = '';
     this.phrases = this.allPhrases;
+  }
+
+  filterByStatus(status: string): void {
+    this.statusFilter = status;
+    this.onSearch();
   }
 
   openEdit(phrase: Phrase): void {
@@ -630,6 +716,23 @@ export class DashboardComponent implements OnInit {
     });
   }
 
+  autofill(): void {
+    if (!this.editForm.text.trim() || this.autofilling) return;
+
+    this.autofilling = true;
+    this.phraseService.autofillPhrase(this.editForm.text.trim()).subscribe({
+      next: (result) => {
+        this.editForm.meaning = result.meaning;
+        this.editForm.example = result.example;
+        this.editForm.personalNote = result.personalNote;
+        this.autofilling = false;
+      },
+      error: () => {
+        this.autofilling = false;
+      }
+    });
+  }
+
   // Swipe handlers
   onTouchStart(event: TouchEvent): void {
     this.touchStartX = event.touches[0].clientX;
@@ -682,6 +785,21 @@ export class DashboardComponent implements OnInit {
         this.allPhrases = this.allPhrases.filter(p => p.id !== phrase.id);
         this.swipedId = null;
       }
+    });
+  }
+
+  exportPhrases(): void {
+    const phraseTexts = this.phrases.map(p => p.text).join('\n');
+    navigator.clipboard.writeText(phraseTexts).then(() => {
+      this.exportMessage = `✓ Copied ${this.phrases.length}`;
+      setTimeout(() => {
+        this.exportMessage = '';
+      }, 2000);
+    }).catch(() => {
+      this.exportMessage = '✗ Failed';
+      setTimeout(() => {
+        this.exportMessage = '';
+      }, 2000);
     });
   }
 }

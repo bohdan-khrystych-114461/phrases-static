@@ -137,9 +137,9 @@ export class PhraseService {
     let nextReviewAt: string;
 
     if (action === 'know') {
-      // Mastered - won't appear again
-      newStatus = 2;
-      nextReviewAt = new Date('9999-12-31').toISOString();
+      // First know -> Learning, schedule for later review
+      newStatus = 1; // Learning
+      nextReviewAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 1 day from now
     } else {
       // Don't know - keep in Learning, show again soon
       newStatus = 1;
