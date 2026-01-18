@@ -23,6 +23,7 @@ import { HeaderComponent } from '../shared/header/header.component';
             class="card" 
             [class.swiping-left]="swipeDirection === 'left'"
             [class.swiping-right]="swipeDirection === 'right'"
+            [class.exiting]="isExiting"
             [style.transform]="'translateX(' + swipeOffset + 'px) rotate(' + (swipeOffset / 20) + 'deg)'"
             (click)="onCardClick($event)"
             (touchstart)="onTouchStart($event)"
@@ -66,7 +67,7 @@ import { HeaderComponent } from '../shared/header/header.component';
       </main>
 
       @if (currentPhrase) {
-        <div class="bottom-bar">
+        <div class="bottom-bar" [class.hidden]="isExiting">
           @if (revealed) {
             <button class="action-btn edit" (click)="openEdit()">
               ✏️
@@ -177,12 +178,16 @@ import { HeaderComponent } from '../shared/header/header.component';
       display: flex;
       flex-direction: column;
       justify-content: center;
-      transition: box-shadow 0.2s, transform 0.15s ease-out;
       touch-action: pan-y;
     }
 
-    .card:active {
+    .card:active:not(.exiting) {
       transform: scale(0.98);
+    }
+
+    .card.exiting {
+      transition: transform 0.25s ease-out, opacity 0.25s ease-out;
+      opacity: 0;
     }
 
     .card.swiping-left {
@@ -257,6 +262,11 @@ import { HeaderComponent } from '../shared/header/header.component';
       max-width: 480px;
       margin: 0 auto;
       background: linear-gradient(to top, rgba(102, 126, 234, 1) 60%, rgba(102, 126, 234, 0) 100%);
+      transition: opacity 0.15s;
+    }
+
+    .bottom-bar.hidden {
+      opacity: 0;
     }
 
     .action-btn {
@@ -522,6 +532,7 @@ export class ReviewComponent implements OnInit {
   // Swipe state
   swipeOffset = 0;
   swipeDirection: 'left' | 'right' | null = null;
+  isExiting = false;
   private touchStartX = 0;
   private touchStartY = 0;
   private isSwiping = false;
@@ -590,16 +601,26 @@ export class ReviewComponent implements OnInit {
 
   onTouchEnd(): void {
     if (this.isSwiping && Math.abs(this.swipeOffset) > this.swipeThreshold) {
-      if (this.swipeDirection === 'left') {
-        this.submitReview('dontKnow');
-      } else if (this.swipeDirection === 'right') {
-        this.submitReview('know');
-      }
+      // Trigger exit animation
+      this.isExiting = true;
+      this.swipeOffset = this.swipeDirection === 'left' ? -500 : 500;
+      
+      const action = this.swipeDirection === 'left' ? 'dontKnow' : 'know';
+      
+      // Wait for exit animation, then submit
+      setTimeout(() => {
+        this.submitReview(action);
+        // Reset after submission
+        this.swipeOffset = 0;
+        this.swipeDirection = null;
+        this.isExiting = false;
+      }, 250);
+    } else {
+      // Snap back
+      this.swipeOffset = 0;
+      this.swipeDirection = null;
     }
     
-    // Reset swipe state
-    this.swipeOffset = 0;
-    this.swipeDirection = null;
     this.isSwiping = false;
   }
 
