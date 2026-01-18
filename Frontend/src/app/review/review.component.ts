@@ -30,7 +30,12 @@ import { HeaderComponent } from '../shared/header/header.component';
             (touchmove)="onTouchMove($event)"
             (touchend)="onTouchEnd()"
           >
-            <div class="phrase-text">{{ currentPhrase.text }}</div>
+            <div class="phrase-text">
+                  {{ currentPhrase.text }}
+                  <button class="speak-btn" [class.speaking]="speaking" (click)="speak(currentPhrase.text, $event)" title="Listen">
+                    🔊
+                  </button>
+                </div>
             
             @if (revealed) {
               <div class="meaning-section">
@@ -515,6 +520,36 @@ import { HeaderComponent } from '../shared/header/header.component';
     .add-phrase-link:hover {
       transform: translateY(-2px);
     }
+
+    .speak-btn {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 4px 8px;
+      margin-left: 8px;
+      opacity: 0.6;
+      transition: opacity 0.2s, transform 0.2s;
+      vertical-align: middle;
+    }
+
+    .speak-btn:hover {
+      opacity: 1;
+    }
+
+    .speak-btn:active {
+      transform: scale(0.9);
+    }
+
+    .speak-btn.speaking {
+      opacity: 1;
+      animation: pulse 0.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
   `]
 })
 export class ReviewComponent implements OnInit {
@@ -610,10 +645,6 @@ export class ReviewComponent implements OnInit {
       // Wait for exit animation, then submit
       setTimeout(() => {
         this.submitReview(action);
-        // Reset after submission
-        this.swipeOffset = 0;
-        this.swipeDirection = null;
-        this.isExiting = false;
       }, 250);
     } else {
       // Snap back
@@ -638,6 +669,7 @@ export class ReviewComponent implements OnInit {
     this.phraseService.submitReview(this.currentPhrase.id, { action }).subscribe({
       next: () => {
         this.submitting = false;
+        this.resetSwipeState();
         if (action === 'dontKnow') {
           // Reload to get the phrase back at end of queue
           this.phrases.splice(this.currentIndex, 1);
@@ -654,6 +686,12 @@ export class ReviewComponent implements OnInit {
         this.submitting = false;
       }
     });
+  }
+
+  resetSwipeState(): void {
+    this.swipeOffset = 0;
+    this.swipeDirection = null;
+    this.isExiting = false;
   }
 
   nextPhrase(): void {
@@ -737,5 +775,27 @@ export class ReviewComponent implements OnInit {
         this.autofilling = false;
       }
     });
+  }
+
+  speaking = false;
+
+  speak(text: string, event: Event): void {
+    event.stopPropagation();
+    
+    if (this.speaking) {
+      speechSynthesis.cancel();
+      this.speaking = false;
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    
+    utterance.onstart = () => this.speaking = true;
+    utterance.onend = () => this.speaking = false;
+    utterance.onerror = () => this.speaking = false;
+    
+    speechSynthesis.speak(utterance);
   }
 }
