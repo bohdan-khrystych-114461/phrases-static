@@ -17,9 +17,8 @@ Thumbs.db
 # Angular cache
 .angular/
 
-# Environment files with secrets (keep environment.ts template)
-# src/environments/environment.ts
-# src/environments/environment.prod.ts
+# Environment files with secrets (templates are committed, local values are ignored)
+src/environments/environment.ts
 
 # Logs
 npm-debug.log*

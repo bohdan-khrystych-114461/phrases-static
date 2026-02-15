@@ -1,8 +1,11 @@
 import { Injectable } from '@angular/core';
 import { from, Observable, map } from 'rxjs';
 import { Phrase, CreatePhraseDto, ReviewActionDto } from '../models/phrase.model';
-import { SupabaseService } from './supabase.service';
+import { FirebaseService } from './firebase.service';
 import { environment } from '../../environments/environment';
+import {
+  collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc
+} from 'firebase/firestore';
 
 interface DbPhrase {
   id: string;
@@ -20,7 +23,11 @@ interface DbPhrase {
   providedIn: 'root'
 })
 export class PhraseService {
-  constructor(private supabase: SupabaseService) {}
+  constructor(private firebase: FirebaseService) {}
+
+  private get phrasesRef() {
+    return collection(this.firebase.firestore, 'phrases');
+  }
 
   private mapDbToPhrase(db: DbPhrase): Phrase {
     const statusMap: Record<number, 'New' | 'Learning' | 'Mastered'> = {
@@ -46,49 +53,51 @@ export class PhraseService {
     return map[status] ?? 0;
   }
 
+  private docToDbPhrase(docSnap: any): DbPhrase {
+    const data = docSnap.data();
+    return { id: docSnap.id, ...data } as DbPhrase;
+  }
+
   getTodayReview(): Observable<Phrase[]> {
     const now = new Date().toISOString();
-    return from(
-      this.supabase.client
-        .from('phrases')
-        .select('*')
-        .neq('status', 2) // Not Mastered
-        .lte('next_review_at', now)
-        .order('next_review_at', { ascending: true })
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-        return (data as DbPhrase[]).map(d => this.mapDbToPhrase(d));
-      })
-    );
+    return from(this.fetchTodayReview(now));
+  }
+
+  private async fetchTodayReview(now: string): Promise<Phrase[]> {
+    const snapshot = await getDocs(this.phrasesRef);
+    const all = snapshot.docs.map(d => this.docToDbPhrase(d));
+    return all
+      .filter(p => p.status !== 2 && p.next_review_at <= now)
+      .sort((a, b) => a.next_review_at.localeCompare(b.next_review_at))
+      .map(p => this.mapDbToPhrase(p));
   }
 
   createPhrase(dto: CreatePhraseDto): Observable<Phrase> {
     const now = new Date().toISOString();
-    return from(
-      this.supabase.client
-        .from('phrases')
-        .insert({
-          text: dto.text,
-          meaning: dto.meaning || null,
-          example: dto.example || null,
-          personal_note: dto.personalNote || null,
-          status: 0,
-          created_at: now,
-          next_review_at: now
-        })
-        .select()
-        .single()
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-        return this.mapDbToPhrase(data as DbPhrase);
-      })
-    );
+    return from(this.addPhrase(dto, now));
+  }
+
+  private async addPhrase(dto: CreatePhraseDto, now: string): Promise<Phrase> {
+    const data = {
+      text: dto.text,
+      meaning: dto.meaning || null,
+      example: dto.example || null,
+      personal_note: dto.personalNote || null,
+      status: 0,
+      created_at: now,
+      last_reviewed_at: null,
+      next_review_at: now
+    };
+    const docRef = await addDoc(this.phrasesRef, data);
+    return this.mapDbToPhrase({ id: docRef.id, ...data });
   }
 
   updatePhrase(id: string, dto: CreatePhraseDto & { status?: string }): Observable<Phrase> {
-    const updateData: Record<string, unknown> = {
+    return from(this.updatePhraseDoc(id, dto));
+  }
+
+  private async updatePhraseDoc(id: string, dto: CreatePhraseDto & { status?: string }): Promise<Phrase> {
+    const updateData: { [key: string]: string | number | null } = {
       text: dto.text,
       meaning: dto.meaning || null,
       example: dto.example || null,
@@ -99,19 +108,10 @@ export class PhraseService {
       updateData['status'] = this.mapStatusToDb(dto.status as 'New' | 'Learning' | 'Mastered');
     }
 
-    return from(
-      this.supabase.client
-        .from('phrases')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single()
-    ).pipe(
-      map(({ data, error }) => {
-        if (error) throw error;
-        return this.mapDbToPhrase(data as DbPhrase);
-      })
-    );
+    const docRef = doc(this.firebase.firestore, 'phrases', id);
+    await updateDoc(docRef, updateData);
+    const updated = await getDoc(docRef);
+    return this.mapDbToPhrase(this.docToDbPhrase(updated));
   }
 
   submitReview(id: string, action: ReviewActionDto): Observable<Phrase> {
@@ -124,13 +124,10 @@ export class PhraseService {
   }
 
   private async processReview(id: string, action: 'know' | 'dontKnow'): Promise<Phrase | null> {
-    const { data: phrase, error: fetchError } = await this.supabase.client
-      .from('phrases')
-      .select('*')
-      .eq('id', id)
-      .single();
+    const docRef = doc(this.firebase.firestore, 'phrases', id);
+    const phraseSnap = await getDoc(docRef);
 
-    if (fetchError || !phrase) return null;
+    if (!phraseSnap.exists()) return null;
 
     const now = new Date().toISOString();
     let newStatus: number;
@@ -146,19 +143,14 @@ export class PhraseService {
       nextReviewAt = new Date(Date.now() + 1000).toISOString(); // 1 second from now
     }
 
-    const { data: updated, error: updateError } = await this.supabase.client
-      .from('phrases')
-      .update({
-        status: newStatus,
-        last_reviewed_at: now,
-        next_review_at: nextReviewAt
-      })
-      .eq('id', id)
-      .select()
-      .single();
+    await updateDoc(docRef, {
+      status: newStatus,
+      last_reviewed_at: now,
+      next_review_at: nextReviewAt
+    });
 
-    if (updateError) throw updateError;
-    return this.mapDbToPhrase(updated as DbPhrase);
+    const updated = await getDoc(docRef);
+    return this.mapDbToPhrase(this.docToDbPhrase(updated));
   }
 
   getAllPhrases(search?: string, status?: string): Observable<Phrase[]> {
@@ -166,36 +158,26 @@ export class PhraseService {
   }
 
   private async fetchAllPhrases(search?: string, status?: string): Promise<Phrase[]> {
-    let query = this.supabase.client
-      .from('phrases')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const snapshot = await getDocs(this.phrasesRef);
+    let phrases = snapshot.docs
+      .map(d => this.mapDbToPhrase(this.docToDbPhrase(d)))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
     if (status) {
-      const statusNum = this.mapStatusToDb(status as 'New' | 'Learning' | 'Mastered');
-      query = query.eq('status', statusNum);
+      phrases = phrases.filter(p => p.status === status);
     }
 
     if (search) {
-      query = query.ilike('text', `%${search}%`);
+      const lower = search.toLowerCase();
+      phrases = phrases.filter(p => p.text.toLowerCase().includes(lower));
     }
 
-    const { data, error } = await query;
-    if (error) throw error;
-    return (data as DbPhrase[]).map(d => this.mapDbToPhrase(d));
+    return phrases;
   }
 
   deletePhrase(id: string): Observable<void> {
-    return from(
-      this.supabase.client
-        .from('phrases')
-        .delete()
-        .eq('id', id)
-    ).pipe(
-      map(({ error }) => {
-        if (error) throw error;
-      })
-    );
+    const docRef = doc(this.firebase.firestore, 'phrases', id);
+    return from(deleteDoc(docRef));
   }
 
   autofillPhrase(text: string): Observable<{ meaning: string; example: string; personalNote: string }> {

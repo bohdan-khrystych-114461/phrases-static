@@ -592,7 +592,8 @@ export class ReviewComponent implements OnInit {
         this.revealed = false;
         this.loading = false;
       },
-      error: () => {
+      error: (err) => {
+        console.error('Failed to load review phrases:', err);
         this.loading = false;
       }
     });
