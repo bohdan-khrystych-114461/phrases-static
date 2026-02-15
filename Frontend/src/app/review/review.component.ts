@@ -667,6 +667,7 @@ export class ReviewComponent implements OnInit {
     if (!this.currentPhrase || this.submitting) return;
 
     this.submitting = true;
+    
     this.phraseService.submitReview(this.currentPhrase.id, { action }).subscribe({
       next: () => {
         this.submitting = false;
