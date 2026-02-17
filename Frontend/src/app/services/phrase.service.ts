@@ -35,6 +35,7 @@ export class PhraseService {
       1: 'Learning',
       2: 'Mastered'
     };
+    
     return {
       id: db.id,
       text: db.text,
